@@ -2,88 +2,126 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 class EditWindow(tk.Toplevel):
-    def __init__(self, parent_app, model_class, session, partner=None):
+    def __init__(self, parent_app, model_class, session, ui_config, record=None):
         super().__init__(parent_app.root)
         self.parent_app = parent_app
         self.model_class = model_class
         self.session = session
-        self.partner = partner
+        self.record = record
+        self.ui_config = ui_config
+        self.widgets = {}
 
-        self.title("Редактирование партнёра" if partner else "Добавление партнёра")
-
-        self.fields = {}
+        self.title("Редактирование" if record else "Добавление")
         self.build_form()
 
     def build_form(self):
-        labels = [
-            ("Наименование", "name"),
-            ("Тип партнёра", "type"),
-            ("Рейтинг", "rating"),
-            ("Адрес", "address"),
-            ("ФИО директора", "director"),
-            ("Телефон", "phone"),
-            ("Email", "email")
-        ]
+        main_frame = ttk.Frame(self)
+        main_frame.pack(padx=10, pady=10, fill="both", expand=True)
 
-        for i, (label_text, field_name) in enumerate(labels):
-            ttk.Label(self, text=label_text).grid(row=i, column=0, sticky="w", padx=10, pady=5)
-            entry = ttk.Entry(self, width=40)
-            entry.grid(row=i, column=1, padx=10, pady=5)
-            self.fields[field_name] = entry
+        sorted_rows = sorted(self.ui_config.layout.items(), key=lambda x: x[0])
+        
+        for row_num, fields in sorted_rows:
+            row_frame = ttk.Frame(main_frame)
+            row_frame.pack(fill="x", pady=5)
+            
+            for field in fields:
+                self.create_field_widget(row_frame, field)
 
-        # Выпадающий список для типа
-        self.fields["type"].destroy()
-        cb = ttk.Combobox(self, values=["Оптовик", "Розничный", "Дистрибьютор", "ООО", "ОАО", "ЗАО"])
-        cb.grid(row=1, column=1, padx=10, pady=5)
-        self.fields["type"] = cb
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(pady=10)
+        
+        ttk.Button(button_frame, text="💾 Сохранить", command=self.save).pack(side="left", padx=5)
+        ttk.Button(button_frame, text="⬅️ Отмена", command=self.destroy).pack(side="left", padx=5)
 
-        # Кнопки
-        ttk.Button(self, text="💾 Сохранить", command=self.save).grid(row=10, column=0, columnspan=2, pady=15)
-        ttk.Button(self, text="⬅️ Назад", command=self.destroy).grid(row=11, column=0, columnspan=2)
-
-        if self.partner:
+        if self.record:
             self.load_data()
 
+    def create_field_widget(self, parent, field):
+        frame = ttk.Frame(parent)
+        frame.pack(side="left", padx=5, expand=True)
+        
+        label_text = self.ui_config.field_labels.get(field, field)
+        ttk.Label(frame, text=label_text).pack(anchor="w")
+        
+        widget_type, options = self.ui_config.special_widgets.get(field, (None, None))
+        
+        if widget_type == 'combobox':
+            widget = ttk.Combobox(frame, values=options)
+        elif widget_type == 'phone':
+            widget = ttk.Entry(frame, validate="key")
+            widget.configure(validatecommand=(widget.register(self.validate_phone), '%P'))
+        elif widget_type == 'currency':
+            widget = ttk.Entry(frame, validate="key")
+            widget.configure(validatecommand=(widget.register(self.validate_currency), '%P'))
+        else:
+            widget = ttk.Entry(frame)
+            
+        widget.pack(fill="x")
+        self.widgets[field] = widget
+
+    def validate_phone(self, value):
+        return all(c in '+0123456789 ()-' for c in value)
+
+    def validate_currency(self, value):
+        if value.replace('.', '', 1).isdigit():
+            return True
+        return False
+
     def load_data(self):
-        """Заполнить форму существующими данными"""
-        for field, widget in self.fields.items():
-            widget.delete(0, tk.END)
-            widget.insert(0, getattr(self.partner, field))
+        for field, widget in self.widgets.items():
+            value = getattr(self.record, field, "")
+            if isinstance(widget, ttk.Combobox):
+                widget.set(str(value))
+            else:
+                widget.delete(0, tk.END)
+                widget.insert(0, str(value))
 
     def save(self):
         try:
-            name = self.fields["name"].get().strip()
-            type_ = self.fields["type"].get().strip()
-            rating = int(self.fields["rating"].get().strip())
-            address = self.fields["address"].get().strip()
-            director = self.fields["director"].get().strip()
-            phone = self.fields["phone"].get().strip()
-            email = self.fields["email"].get().strip()
+            data = {}
+            for field, widget in self.widgets.items():
+                value = widget.get() if isinstance(widget, ttk.Entry) else widget.get()
+                
+                if field in self.ui_config.special_widgets:
+                    value = self.process_special_field(field, value)
+                
+                data[field] = value
 
-            if not name or rating < 0:
-                raise ValueError("Имя обязательно, рейтинг должен быть неотрицательным числом")
-
-            if self.partner:
-                partner = self.partner
+            self.validate_data(data)
+            
+            if self.record:
+                record = self.record
             else:
-                partner = self.model_class()
-
-            partner.name = name
-            partner.type = type_
-            partner.rating = rating
-            partner.address = address
-            partner.director = director
-            partner.phone = phone
-            partner.email = email
-
-            self.session.add(partner)
+                record = self.model_class()
+            
+            for field, value in data.items():
+                setattr(record, field, value)
+            
+            self.session.add(record)
             self.session.commit()
-
-            messagebox.showinfo("Успешно", "Данные партнёра сохранены.")
+            
+            messagebox.showinfo("Успешно", "Данные сохранены")
             self.parent_app.refresh()
             self.destroy()
 
-        except ValueError as ve:
-            messagebox.showerror("Ошибка ввода", str(ve))
+        except Exception as e:
+            messagebox.showerror("Ошибка", str(e))
+
+    def process_special_field(self, field, value):
+        widget_type, _ = self.ui_config.special_widgets.get(field)
+        
+        if widget_type == 'currency':
+            return float(value)
+        elif widget_type == 'phone':
+            return ''.join(filter(str.isdigit, value))
+        return value
+
+    def validate_data(self, data):
+        required_fields = [field for field, (wt, _) in self.ui_config.special_widgets.items() 
+                          if wt == 'required']
+        
+        for field in required_fields:
+            if not data.get(field):
+                raise ValueError(f"Поле '{field}' обязательно для заполнения")
         except Exception as e:
             messagebox.showerror("Ошибка", f"Произошла ошибка:\n{e}")
