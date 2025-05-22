@@ -1,7 +1,8 @@
 from collections import defaultdict
 from tkinter import Tk
 from dooby.core import init_db
-from dooby.gui.main_page import DooByApp, UILayoutConfig
+from dooby.gui.main_page import DooByApp
+from dooby.gui.ui_layout_config import UILayoutConfig
 from models import Partner
 
 #Инициализируем БД
