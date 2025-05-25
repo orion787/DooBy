@@ -122,7 +122,7 @@ class EditWindow(tk.Toplevel):
         
         for field in required_fields:
             if not data.get(field):
-                raise ValueError(f"Поле '{field}' обязательно для заполнения")
+                required_fields = [field for field, (wt, _) in self.ui_config.special_widgets.items() 
                           if wt == 'required']
         
         for field in required_fields:
