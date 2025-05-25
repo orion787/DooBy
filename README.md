@@ -61,6 +61,7 @@ ui_config.layout = defaultdict(list, {
 ui_config.set_field_label('name', 'Наименование')
 ui_config.set_field_label('type', 'Тип организации')
 ui_config.set_field_label('discount', 'Скидка')
+ui_config.set_field_suffix('discount', '%') 
 ui_config.set_field_label('phone', 'Телефон')
 ui_config.set_special_widget('type', 'combobox', ['ООО', 'ИП', 'АО'])
 ui_config.set_special_widget('phone', 'phone')
