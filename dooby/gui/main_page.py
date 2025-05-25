@@ -16,67 +16,87 @@ class DooByApp:
         self.ui_config = ui_config or UILayoutConfig(model_class)
 
         root.title(title)
-        self.setup_ui(logo_path, icon_path)
-        self.render()
+        root.configure(bg='white')
+        self._build_ui(logo_path, icon_path)
+        self._populate()
 
-    def setup_ui(self, logo_path, icon_path):
+    def _build_ui(self, logo_path, icon_path):
         if icon_path:
             self.root.iconbitmap(icon_path)
         if logo_path:
             logo = Image.open(logo_path).resize((100, 100))
             self.logo_img = ImageTk.PhotoImage(logo)
-            tk.Label(self.root, image=self.logo_img).pack(pady=10)
+            tk.Label(self.root, image=self.logo_img, bg='white').pack(pady=10)
 
-        ttk.Button(self.root, text="➕ Добавить", command=self.add_record).pack(pady=(0, 10))
+        ttk.Button(self.root, text="➕ Добавить", command=self.add_record).pack(pady=(0,10))
 
-        self.canvas = tk.Canvas(self.root)
-        self.scroll_y = tk.Scrollbar(self.root, orient="vertical", command=self.canvas.yview)
-        self.frame = ttk.Frame(self.canvas)
+        container = tk.Frame(self.root, bg='white')
+        container.pack(fill="both", expand=True)
+
+        self.canvas = tk.Canvas(container, bg='white', highlightthickness=0)
+        self.v_scroll = ttk.Scrollbar(container, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.v_scroll.set)
+
+        self.scrollable_frame = tk.Frame(self.canvas, bg='white')
+        self.scrollable_window = self.canvas.create_window((0,0),
+                                                           window=self.scrollable_frame,
+                                                           anchor="nw")
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
 
         self.canvas.pack(side="left", fill="both", expand=True)
-        self.scroll_y.pack(side="right", fill="y")
+        self.v_scroll.pack(side="right", fill="y")
 
-        self.frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.create_window((0, 0), window=self.frame, anchor="nw")
-        self.canvas.configure(yscrollcommand=self.scroll_y.set)
+        self.canvas.bind("<Configure>", self._on_canvas_resize)
 
-    def render(self):
-        for widget in self.frame.winfo_children():
-            widget.destroy()
+    def _on_canvas_resize(self, event):
+        self.canvas.itemconfig(self.scrollable_window, width=event.width)
+        self._populate()
 
+    def _populate(self):
+        for w in self.scrollable_frame.winfo_children():
+            w.destroy()
         for record in self.session.query(self.model_class).all():
-            self.render_card(record)
+            self._render_card(record)
 
-    def render_card(self, record):
-        card_frame = ttk.Frame(self.frame, relief="solid", borderwidth=1, padding=10)
-        card_frame.pack(fill="x", padx=10, pady=5, expand=True)
-        card_frame.bind("<Button-1>", lambda e, r=record: self.edit_record(r))
+    def _render_card(self, record):
+        card = tk.Frame(self.scrollable_frame, bg='white', bd=1, relief='solid')
+        card.pack(fill="x", padx=10, pady=5)
+        card.bind("<Button-1>", lambda e, r=record: self.edit_record(r))
 
-        # Сортировка строк по номеру
-        sorted_rows = sorted(self.ui_config.layout.items(), key=lambda x: x[0])
-        
-        for row_num, fields in sorted_rows:
-            row_frame = ttk.Frame(card_frame)
-            row_frame.pack(fill="x", pady=2)
-            
-            for field in fields:
+        FONT_BODY = ("Arial", 10)
+        rows = sorted(self.ui_config.layout.items(), key=lambda x: x[0])
+        for _, fields in rows:
+            row = tk.Frame(card, bg='white')
+            row.pack(fill="x", pady=2, padx=5)
+
+            cols = len(fields)
+            for idx, field in enumerate(fields):
+                row.columnconfigure(idx, weight=1)
                 if not hasattr(record, field):
                     continue
-                    
-                value = getattr(record, field)
-                if field in self.ui_config.special_widgets:
-                    value = self.format_special_field(field, value)
-                
-                label_text = self.ui_config.field_labels.get(field, field)
-                ttk.Label(row_frame, text=f"{label_text}: {value}").pack(side="left", padx=5)
 
-    def format_special_field(self, field, value):
-        widget_type, _ = self.ui_config.special_widgets.get(field, (None, None))
-        
-        if widget_type == 'phone':
+                raw = getattr(record, field)
+                if field in self.ui_config.special_widgets:
+                    raw = self._format_special(field, raw)
+
+                label = self.ui_config.field_labels.get(field, field)
+                suffix = self.ui_config.field_suffix.get(field, "")
+
+                text = f"{label}: {raw}{suffix}"
+
+                lbl = tk.Label(row, text=text, bg='white', font=FONT_BODY, anchor="w")
+                lbl.grid(row=0, column=idx, sticky="ew", padx=5)
+
+    def _format_special(self, field, value):
+        wtype, _ = self.ui_config.special_widgets[field]
+        if wtype == 'phone':
             return self.format_phone(value)
-        elif widget_type == 'currency':
-            return f"{value:.2f} руб."
+        if wtype == 'currency':
+            return f"{value:.2f}"
         return value
 
     def format_phone(self, phone):
@@ -94,4 +114,4 @@ class DooByApp:
         EditWindow(self, self.model_class, self.session, self.ui_config, record)
 
     def refresh(self):
-        self.render()
+        self._populate()
