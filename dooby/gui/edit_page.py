@@ -123,3 +123,8 @@ class EditWindow(tk.Toplevel):
         for field in required_fields:
             if not data.get(field):
                 raise ValueError(f"Поле '{field}' обязательно для заполнения")
+                          if wt == 'required']
+        
+        for field in required_fields:
+            if not data.get(field):
+                raise ValueError(f"Поле '{field}' обязательно для заполнения")
