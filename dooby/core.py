@@ -9,6 +9,10 @@ def init_db(path=":memory:"):
     global _engine, Session
     _engine = create_engine(f"sqlite:///{path}", echo=False)
     Session = sessionmaker(bind=_engine)
+
+    #Создание всех таблиц моделей при необходимости
+    Base.metadata.create_all(_engine)
+
     return _engine
 
 def get_session():
