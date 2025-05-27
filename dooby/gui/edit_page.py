@@ -19,17 +19,18 @@ class EditWindow(tk.Toplevel):
         main_frame.pack(padx=10, pady=10, fill="both", expand=True)
 
         sorted_rows = sorted(self.ui_config.layout.items(), key=lambda x: x[0])
-        
+
         for row_num, fields in sorted_rows:
             row_frame = ttk.Frame(main_frame)
             row_frame.pack(fill="x", pady=5)
-            
+
             for field in fields:
-                self.create_field_widget(row_frame, field)
+                if not self.is_read_only_property(field):
+                    self.create_field_widget(row_frame, field)
 
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(pady=10)
-        
+
         ttk.Button(button_frame, text="💾 Сохранить", command=self.save).pack(side="left", padx=5)
         ttk.Button(button_frame, text="⬅️ Отмена", command=self.destroy).pack(side="left", padx=5)
 
@@ -39,12 +40,12 @@ class EditWindow(tk.Toplevel):
     def create_field_widget(self, parent, field):
         frame = ttk.Frame(parent)
         frame.pack(side="left", padx=5, expand=True)
-        
+
         label_text = self.ui_config.field_labels.get(field, field)
         ttk.Label(frame, text=label_text).pack(anchor="w")
-        
+
         widget_type, options = self.ui_config.special_widgets.get(field, (None, None))
-        
+
         if widget_type == 'combobox':
             widget = ttk.Combobox(frame, values=options)
         elif widget_type == 'phone':
@@ -55,7 +56,7 @@ class EditWindow(tk.Toplevel):
             widget.configure(validatecommand=(widget.register(self.validate_currency), '%P'))
         else:
             widget = ttk.Entry(frame)
-            
+
         widget.pack(fill="x")
         self.widgets[field] = widget
 
@@ -80,26 +81,27 @@ class EditWindow(tk.Toplevel):
         try:
             data = {}
             for field, widget in self.widgets.items():
-                value = widget.get() if isinstance(widget, ttk.Entry) else widget.get()
-                
+                value = widget.get()
+                if value == "":
+                    raise ValueError(f"Поле '{field}' не может быть пустым")
                 if field in self.ui_config.special_widgets:
                     value = self.process_special_field(field, value)
-                
                 data[field] = value
 
             self.validate_data(data)
-            
+
             if self.record:
                 record = self.record
             else:
                 record = self.model_class()
-            
+
             for field, value in data.items():
-                setattr(record, field, value)
-            
+                if not self.is_read_only_property(field):
+                    setattr(record, field, value)
+
             self.session.add(record)
             self.session.commit()
-            
+
             messagebox.showinfo("Успешно", "Данные сохранены")
             self.parent_app.refresh()
             self.destroy()
@@ -109,7 +111,7 @@ class EditWindow(tk.Toplevel):
 
     def process_special_field(self, field, value):
         widget_type, _ = self.ui_config.special_widgets.get(field)
-        
+
         if widget_type == 'currency':
             return float(value)
         elif widget_type == 'phone':
@@ -117,14 +119,19 @@ class EditWindow(tk.Toplevel):
         return value
 
     def validate_data(self, data):
-        required_fields = [field for field, (wt, _) in self.ui_config.special_widgets.items() 
-                          if wt == 'required']
-        
-        for field in required_fields:
-            if not data.get(field):
-                required_fields = [field for field, (wt, _) in self.ui_config.special_widgets.items() 
-                          if wt == 'required']
-        
+        required_fields = [
+            field for field, (wt, _) in self.ui_config.special_widgets.items()
+            if wt == 'required'
+        ]
         for field in required_fields:
             if not data.get(field):
                 raise ValueError(f"Поле '{field}' обязательно для заполнения")
+
+    def is_read_only_property(self, field):
+        """
+        Проверяет, является ли поле свойством только для чтения.
+        """
+        attr = getattr(self.model_class, field, None)
+        if isinstance(attr, property):
+            return attr.fset is None
+        return False
