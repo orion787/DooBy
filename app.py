@@ -8,7 +8,8 @@ from models import Partner
 
 #Инициализируем БД
 engine = init_db("partners.db")
-
+ui_config = UILayoutConfig(Partner)
+ui_config.excluded_fields.append('fideninfo')
 
 # Настраиваем лейаут
 ui_config.set_background_color("#F0F0F0")
