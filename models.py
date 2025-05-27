@@ -1,7 +1,7 @@
-from dooby.fields import StringField, IntegerField, FloatField, KeyField, DateTimeField, RefTo, ExternalKey
-from dooby.model import Model
+from dooby.fields import *
+from dooby.model import Base
 
-class Partner(Model):
+class Partner(Base):
     __tablename__ = "partners"
     id = KeyField()
     name = StringField()
@@ -29,7 +29,7 @@ class Partner(Model):
             return 15
 
 
-class Product(Model):
+class Product(Base):
     __tablename__ = "products"
     id = KeyField()
     name = StringField()
@@ -39,7 +39,7 @@ class Product(Model):
     sales = RefTo("Sale", "product")
 
 
-class Sale(Model):
+class Sale(Base):
     __tablename__ = "sales"
     id = KeyField()
     partner_id = ExternalKey("partners.id")
