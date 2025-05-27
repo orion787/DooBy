@@ -5,6 +5,7 @@ from dooby.core import get_session
 from dooby.gui.edit_page import EditWindow
 from dooby.gui.ui_layout_config import UILayoutConfig
 
+
 class DooByApp:
     def __init__(self, root, model_class, title="DooBy App", 
                  logo_path=None, icon_path=None, 
@@ -16,7 +17,7 @@ class DooByApp:
         self.ui_config = ui_config or UILayoutConfig(model_class)
 
         root.title(title)
-        root.configure(bg='white')
+        root.configure(bg=self.ui_config.background_color)
         self._build_ui(logo_path, icon_path)
         self._populate()
 
@@ -26,21 +27,29 @@ class DooByApp:
         if logo_path:
             logo = Image.open(logo_path).resize((100, 100))
             self.logo_img = ImageTk.PhotoImage(logo)
-            tk.Label(self.root, image=self.logo_img, bg='white').pack(pady=10)
+            tk.Label(self.root, image=self.logo_img, 
+                    bg=self.ui_config.background_color).pack(pady=10)
 
-        ttk.Button(self.root, text="➕ Добавить", command=self.add_record).pack(pady=(0,10))
+        btn_style = ttk.Style()
+        btn_style.configure('Accent.TButton', background=self.ui_config.accent_color)
+        
+        ttk.Button(self.root, text="➕ Добавить", 
+                 command=self.add_record, style='Accent.TButton').pack(pady=(0,10))
 
-        container = tk.Frame(self.root, bg='white')
+        container = tk.Frame(self.root, bg=self.ui_config.background_color)
         container.pack(fill="both", expand=True)
 
-        self.canvas = tk.Canvas(container, bg='white', highlightthickness=0)
-        self.v_scroll = ttk.Scrollbar(container, orient="vertical", command=self.canvas.yview)
+        self.canvas = tk.Canvas(container, bg=self.ui_config.background_color, 
+                               highlightthickness=0)
+        self.v_scroll = ttk.Scrollbar(container, orient="vertical", 
+                                    command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=self.v_scroll.set)
 
-        self.scrollable_frame = tk.Frame(self.canvas, bg='white')
+        self.scrollable_frame = tk.Frame(self.canvas, 
+                                        bg=self.ui_config.background_color)
         self.scrollable_window = self.canvas.create_window((0,0),
-                                                           window=self.scrollable_frame,
-                                                           anchor="nw")
+                                                         window=self.scrollable_frame,
+                                                         anchor="nw")
 
         self.scrollable_frame.bind(
             "<Configure>",
@@ -62,20 +71,28 @@ class DooByApp:
         for record in self.session.query(self.model_class).all():
             self._render_card(record)
 
+    # main_page.py (обновлённый метод _render_card)
     def _render_card(self, record):
-        card = tk.Frame(self.scrollable_frame, bg='white', bd=1, relief='solid')
-        card.pack(fill="x", padx=10, pady=5)
+        card = tk.Frame(self.scrollable_frame, 
+                    bg=self.ui_config.card_background,
+                    bd=1, 
+                    relief='solid',
+                    padx=10,
+                    pady=5)
+        card.pack(fill="x", padx=10, pady=self.ui_config.card_spacing)
         card.bind("<Button-1>", lambda e, r=record: self.edit_record(r))
 
-        FONT_BODY = ("Arial", 10)
         rows = sorted(self.ui_config.layout.items(), key=lambda x: x[0])
         for _, fields in rows:
-            row = tk.Frame(card, bg='white')
-            row.pack(fill="x", pady=2, padx=5)
+            row = tk.Frame(card, bg=self.ui_config.card_background)
+            row.pack(fill="x", pady=2)
 
-            cols = len(fields)
+            # Конфигурация колонок только для left_custom_spacing
+            if self.ui_config.alignment == 'left_custom_spacing':
+                for col_idx in range(len(fields)):
+                    row.columnconfigure(col_idx, weight=0)  # Отключаем растягивание
+
             for idx, field in enumerate(fields):
-                row.columnconfigure(idx, weight=1)
                 if not hasattr(record, field):
                     continue
 
@@ -83,13 +100,46 @@ class DooByApp:
                 if field in self.ui_config.special_widgets:
                     raw = self._format_special(field, raw)
 
-                label = self.ui_config.field_labels.get(field, field)
+                label = self.ui_config.field_labels.get(field, "")
                 suffix = self.ui_config.field_suffix.get(field, "")
 
-                text = f"{label}: {raw}{suffix}"
+                text = f"{label} {raw}{suffix}"
+                
+                # Обработка разных типов выравнивания
+                if self.ui_config.alignment == 'left_custom_spacing':
+                    anchor = 'w'
+                    sticky = 'w'
+                    # Отступ только справа для всех кроме последнего элемента
+                    padx = (0, self.ui_config.inter_element_spacing) if idx < len(fields)-1 else (0, 0)
+                elif self.ui_config.alignment == 'first_left':
+                    anchor = 'w' if idx == 0 else 'center'
+                    sticky = 'w' if idx == 0 else 'ew'
+                    padx = (self.ui_config.element_spacing, self.ui_config.element_spacing)
+                else:
+                    anchor = {
+                        'left': 'w',
+                        'center': 'center',
+                        'right': 'e'
+                    }[self.ui_config.alignment]
+                    sticky = 'ew'
+                    padx = (self.ui_config.element_spacing, self.ui_config.element_spacing)
 
-                lbl = tk.Label(row, text=text, bg='white', font=FONT_BODY, anchor="w")
-                lbl.grid(row=0, column=idx, sticky="ew", padx=5)
+                lbl = tk.Label(row, 
+                            text=text, 
+                            bg=self.ui_config.card_background,
+                            font=self.ui_config.font_body,
+                            anchor=anchor)
+                lbl.grid(row=0, 
+                        column=idx, 
+                        sticky=sticky, 
+                        padx=padx,
+                        pady=0)
+
+                # Для left_custom_spacing добавляем промежутки через пустые колонки
+                if self.ui_config.alignment == 'left_custom_spacing' and idx < len(fields)-1:
+                    spacer = tk.Frame(row, width=self.ui_config.inter_element_spacing, 
+                                    bg=self.ui_config.card_background)
+                    spacer.grid(row=0, column=idx*2+1)
 
     def _format_special(self, field, value):
         wtype, _ = self.ui_config.special_widgets[field]
