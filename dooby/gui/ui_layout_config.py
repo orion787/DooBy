@@ -75,4 +75,5 @@ class Colors():
     lightblue = "#B9D7F1"
     seashell = '#FFF5EE'
     peach = '#fdd9b5'
+    smoke = '#F0F0F0'
     gray = '#b5b8b1'
