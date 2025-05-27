@@ -9,14 +9,17 @@ from models import Partner
 engine = init_db("partners.db")
 
 
-#Инициализация контекста модели
-ui_config = UILayoutConfig(Partner)
-ui_config.excluded_fields.append('fideninfo')
-
-
 # Настраиваем лейаут
+ui_config.set_background_color("#F0F0F0")
+ui_config.set_card_background(Colors.lightblue)
+ui_config.set_alignment('left_custom_spacing')
+ui_config.set_inter_element_spacing(40)
+ui_config.set_card_spacing(10)
+ui_config.set_font(('Arial', 14))
+
+
 ui_config.layout = defaultdict(list, {
-    1: ['name', 'type', 'discount'],
+    1: ['type', 'name', 'discount'],
     2: ['phone'],
     3: ['director'],
     4: ['rating']
