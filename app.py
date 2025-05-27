@@ -17,7 +17,7 @@ ui_config.excluded_fields.append('fideninfo')
 # Настраиваем лейаут
 ui_config.layout = defaultdict(list, {
     1: ['name', 'type', 'discount'],
-    2: ['phone', 'email'],
+    2: ['phone'],
     3: ['director'],
     4: ['rating']
 })
