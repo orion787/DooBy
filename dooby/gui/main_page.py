@@ -71,7 +71,6 @@ class DooByApp:
         for record in self.session.query(self.model_class).all():
             self._render_card(record)
 
-    # main_page.py (обновлённый метод _render_card)
     def _render_card(self, record):
         card = tk.Frame(self.scrollable_frame, 
                     bg=self.ui_config.card_background,
@@ -87,10 +86,18 @@ class DooByApp:
             row = tk.Frame(card, bg=self.ui_config.card_background)
             row.pack(fill="x", pady=2)
 
-            # Конфигурация колонок только для left_custom_spacing
+            # Конфигурация колонок
+            for col_idx in range(len(fields)):
+                if self.ui_config.alignment == 'first_left':
+                    weight = 1 if col_idx > 0 else 0
+                    row.columnconfigure(col_idx, weight=weight, uniform='group1')
+                else:
+                    row.columnconfigure(col_idx, weight=1)
+
             if self.ui_config.alignment == 'left_custom_spacing':
                 for col_idx in range(len(fields)):
                     row.columnconfigure(col_idx, weight=0)  # Отключаем растягивание
+
 
             for idx, field in enumerate(fields):
                 if not hasattr(record, field):
@@ -105,7 +112,7 @@ class DooByApp:
 
                 text = f"{label} {raw}{suffix}"
                 
-                # Обработка разных типов выравнивания
+                # Определение параметров отображения
                 if self.ui_config.alignment == 'left_custom_spacing':
                     anchor = 'w'
                     sticky = 'w'
@@ -129,17 +136,10 @@ class DooByApp:
                             bg=self.ui_config.card_background,
                             font=self.ui_config.font_body,
                             anchor=anchor)
-                lbl.grid(row=0, 
-                        column=idx, 
+                lbl.grid(row=0, column=idx, 
                         sticky=sticky, 
                         padx=padx,
                         pady=0)
-
-                # Для left_custom_spacing добавляем промежутки через пустые колонки
-                if self.ui_config.alignment == 'left_custom_spacing' and idx < len(fields)-1:
-                    spacer = tk.Frame(row, width=self.ui_config.inter_element_spacing, 
-                                    bg=self.ui_config.card_background)
-                    spacer.grid(row=0, column=idx*2+1)
 
     def _format_special(self, field, value):
         wtype, _ = self.ui_config.special_widgets[field]
