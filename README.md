@@ -6,7 +6,7 @@
 ---
 
 ### 📋 Requirements
-tk, pillow, sqlalchemy
+tk, pillow, sqlalchemy, openpyxl, pandas
 
 ---
 
